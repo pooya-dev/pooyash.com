@@ -1,0 +1,47 @@
+name: Publish website
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '23 11 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/configure-pages@v5
+      - name: Restore the article archive
+        uses: actions/cache/restore@v4
+        with:
+          path: content/posts.json
+          key: techlaw-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: techlaw-
+      - name: Build site and refresh TechLaw Watch
+        run: python3 scripts/build.py --refresh-feed
+      - name: Preserve the article archive
+        uses: actions/cache/save@v4
+        with:
+          path: content/posts.json
+          key: techlaw-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
